@@ -1,0 +1,92 @@
+name: Update COD-AB data and deploy
+
+on:
+  schedule:
+    - cron: "30 6 * * *"   # 06:30 UTC = 13:30 Bangkok
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: codab-pages
+  cancel-in-progress: false
+
+env:
+  FIS_BASE: https://ocha-dap.github.io/hdx-cod-ab-status/data
+
+jobs:
+  sync:
+    name: Copy CSV files from the FIS dashboard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download and check the CSV files
+        id: download
+        run: |
+          set -euo pipefail
+          mkdir -p data incoming
+          for f in work gis cod_metadata hdx m49 plans offices regions; do
+            curl -fsSL --retry 3 --retry-delay 15 "$FIS_BASE/$f.csv?t=$(date +%s)" -o "incoming/$f.csv"
+            rows=$(wc -l < "incoming/$f.csv")
+            if [ "$rows" -lt 2 ]; then
+              echo "::error::$f.csv came back with no data rows. Keeping the previous copy."
+              exit 1
+            fi
+            echo "$f.csv: $rows lines"
+          done
+          check() { head -1 "incoming/$1.csv" | grep -q "$2" || { echo "::error::$1.csv no longer has column '$2'. Update index.html before syncing."; exit 1; }; }
+          check cod_metadata country_iso3
+          check cod_metadata date_reviewed
+          check cod_metadata update_frequency
+          check work planned_quarter
+          check regions regional
+          check plans type
+          changed=0
+          for f in incoming/*.csv; do
+            name=$(basename "$f")
+            if ! cmp -s "$f" "data/$name"; then changed=1; cp "$f" "data/$name"; echo "updated $name"; fi
+          done
+          rm -rf incoming
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
+      - name: Commit the new data
+        if: steps.download.outputs.changed == '1'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/*.csv
+          git commit -m "Update COD-AB data from FIS dashboard ($(date -u +%Y-%m-%d))"
+          git push
+
+  deploy:
+    name: Publish to GitHub Pages
+    needs: sync
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Record the sync time
+        run: |
+          status="${{ needs.sync.result }}"
+          printf '{"synced_at":"%s","sync_status":"%s","source":"%s"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$status" "$FIS_BASE" > data/last_sync.json
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
