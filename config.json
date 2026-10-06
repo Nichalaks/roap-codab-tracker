@@ -1,0 +1,24 @@
+{
+  "regionalOffice": "ROAP",
+  "fisBase": "https://ocha-dap.github.io/hdx-cod-ab-status/data/",
+  "rfm": {
+    "year": 2026,
+    "source": "Asia and the Pacific 2026 Regional Focus Model (January 2026), OCHA ROAP",
+    "ranks": {
+      "AFG": 1, "MMR": 2, "PAK": 3, "PNG": 4, "BGD": 5, "PHL": 6, "IND": 7, "NPL": 8,
+      "IDN": 9, "PRK": 10, "KHM": 11, "VUT": 12, "THA": 13, "SLB": 14, "VNM": 15,
+      "TLS": 16, "LAO": 17, "LKA": 18, "KIR": 19, "MHL": 20, "FSM": 21, "FJI": 22,
+      "MYS": 23, "MNG": 24, "TON": 25, "WSM": 26, "CHN": 27, "BTN": 28, "TUV": 29,
+      "AUS": 30, "PLW": 31, "BRN": 32, "JPN": 33, "MDV": 34, "KOR": 35, "NRU": 36,
+      "NZL": 37, "SGP": 38
+    }
+  },
+  "shortNames": {
+    "LAO": "Lao PDR",
+    "PRK": "Korea DPR",
+    "KOR": "Republic of Korea",
+    "FSM": "Micronesia (Fed. States)",
+    "NRU": "Nauru",
+    "IRN": "Iran"
+  }
+}

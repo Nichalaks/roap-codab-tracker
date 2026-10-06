@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ROAP COD-AB Tracker</title>
+<meta name="description" content="COD-AB review status for countries covered by OCHA ROAP, sorted by review urgency. Data from the OCHA FIS COD-AB Status Dashboard.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap">
+<style>
+body{margin:0}
+/* Layout: one working surface — header, status tiles that double as filters, then a dense sortable register of countries.
+   OCHA visual identity: UN Blue ramp carries the page; black text on white; Grey #999999 for rules;
+   accent colours (red, orange, yellow, green) only to flag review state, used as stripes, dots and tints — text stays black. */
+:root{
+  /* OCHA blue ramp */
+  --b900:#002E6E; --b800:#004987; --b700:#0074B7; --un:#009EDB; --b400:#64BDEA; --b200:#C5DFEF; --b100:#E3EDF6;
+  /* OCHA accents */
+  --red:#ED1847; --orange:#F58220; --yellow:#FFC800; --green:#72BF44; --grey:#999999;
+  /* theme tokens (light) */
+  --bg:#FFFFFF; --surface:#FFFFFF; --surface-2:var(--b100); --ink:#000000; --muted:#4D4D4D; --line:var(--b200); --rule:var(--grey);
+  --accent:var(--un); --accent-ink:var(--b700); --accent-strong:var(--b700); --accent-soft:var(--b100); --on-accent:#FFFFFF;
+  --red-soft:#FDE3E9; --orange-soft:#FEEBDA; --yellow-soft:#FFF4C7; --green-soft:#E8F4DF; --grey-soft:#EFEFEF;
+  --display:"Roboto",Arial,sans-serif; --body:"Roboto",Arial,sans-serif;
+  --mono:"Roboto Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:4px; color-scheme:light;
+}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.45}
+.wrap{max-width:1440px;margin:0 auto;padding-inline:clamp(16px,3vw,32px);padding-block:24px 48px;display:flex;flex-direction:column;gap:20px}
+a{color:var(--accent-ink)}
+a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+header.top{display:flex;flex-wrap:wrap;gap:16px 32px;align-items:flex-end;justify-content:space-between;border-bottom:4px solid var(--accent);padding-bottom:16px}
+.eyebrow{text-transform:uppercase;letter-spacing:.08em;font-size:12px;font-weight:700;color:var(--accent-ink);margin:0}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(26px,3.4vw,36px);line-height:1.1;margin:4px 0 6px;color:var(--accent);text-wrap:balance}
+.lede{margin:0;color:var(--ink);max-width:68ch}
+.meta{display:flex;flex-direction:column;gap:8px;align-items:flex-start;min-width:0}
+.meta-line{font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 14px}
+.meta-line b{color:var(--ink);font-weight:500}
+.btn{font:500 13px var(--body);border:1px solid var(--accent-strong);background:var(--accent-strong);color:var(--on-accent);border-radius:var(--r);padding:7px 14px;cursor:pointer;display:inline-flex;gap:8px;align-items:center}
+.btn:hover{background:var(--b800);border-color:var(--b800)}
+.btn[disabled]{opacity:.55;cursor:progress}
+.btn.ghost{background:transparent;color:var(--accent-ink);border-color:var(--accent)}
+.btn.ghost:hover{background:var(--accent-soft)}
+.note{font-size:12.5px;color:var(--muted);max-width:52ch}
+.note.err{color:var(--ink);border-left:3px solid var(--red);padding-left:8px}
+.note.good{color:var(--ink);border-left:3px solid var(--green);padding-left:8px}
+.scope{display:inline-flex;border:1px solid var(--accent);border-radius:var(--r);overflow:hidden;background:var(--surface)}
+.scope button{font:500 13px var(--body);border:0;background:transparent;color:var(--accent-ink);padding:7px 14px;cursor:pointer}
+.scope button[aria-pressed="true"]{background:var(--accent-strong);color:var(--on-accent)}
+.bar{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;justify-content:space-between}
+.bar .tools{flex:1 1 320px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.tile{all:unset;box-sizing:border-box;cursor:pointer;background:var(--surface);border:1px solid var(--line);border-top:5px solid var(--c,var(--accent));border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.tile:hover{background:var(--surface-2)}
+.tile:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tile[aria-pressed="true"]{background:var(--soft,var(--accent-soft));border-color:var(--c,var(--accent))}
+.tile .num{font-size:32px;font-weight:700;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums}
+.tile .lbl{font-size:12.5px;font-weight:500}
+.tile .sub{font-size:11.5px;color:var(--muted)}
+.t-overdue{--c:var(--red);--soft:var(--red-soft)} .t-due30{--c:var(--orange);--soft:var(--orange-soft)} .t-due90{--c:var(--yellow);--soft:var(--yellow-soft)}
+.t-ok{--c:var(--green);--soft:var(--green-soft)} .t-none{--c:var(--grey);--soft:var(--grey-soft)} .t-wo{--c:var(--un);--soft:var(--accent-soft)}
+.tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.search{font:14px var(--body);background:var(--surface);color:var(--ink);border:1px solid var(--rule);border-radius:var(--r);padding:7px 10px;width:min(280px,100%)}
+.count{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tablebox{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:auto;max-height:78vh}
+table{border-collapse:separate;border-spacing:0;width:100%;min-width:1440px;font-variant-numeric:tabular-nums}
+thead th{position:sticky;background:var(--surface-2);z-index:2;text-align:left;font-weight:500;border-bottom:1px solid var(--line);white-space:nowrap}
+thead tr.h th{top:0;padding:0;border-bottom:2px solid var(--accent)}
+thead tr.f th{top:39px;padding:6px 8px;background:var(--surface)}
+th.num-col .sort{justify-content:flex-end}
+.sort{all:unset;box-sizing:border-box;cursor:pointer;display:flex;gap:6px;align-items:center;width:100%;padding:10px 10px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:var(--b800)}
+.sort:hover{color:var(--accent-ink)}
+.sort:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.sort[aria-sort="ascending"],.sort[aria-sort="descending"]{color:var(--accent-ink)}
+.sort .ar{font-size:10px;opacity:.7}
+thead select,thead input{font:12.5px var(--body);width:100%;min-width:84px;background:var(--surface);color:var(--ink);border:1px solid var(--rule);border-radius:var(--r);padding:4px 6px}
+thead select.on,thead input.on{border-color:var(--accent);background:var(--accent-soft)}
+tbody td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tbody td.num{text-align:right}
+tbody tr.row{cursor:pointer}
+tbody tr.row:hover td{background:var(--surface-2)}
+tbody tr.row td:first-child{border-left:5px solid var(--sev,transparent)}
+tr.s-overdue{--sev:var(--red)} tr.s-due30{--sev:var(--orange)} tr.s-due90{--sev:var(--yellow)} tr.s-ok{--sev:var(--green)} tr.s-none{--sev:var(--grey)}
+.cname{display:flex;flex-direction:column;gap:2px;min-width:170px}
+.cname .nm{font-weight:500}
+.cname .iso{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.chev{display:inline-block;width:12px;color:var(--accent);transition:transform .15s}
+tr.open .chev{transform:rotate(90deg)}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 9px 2px 7px;font-size:12px;font-weight:500;white-space:nowrap;background:var(--soft);color:var(--ink)}
+.pill::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--c)}
+.p-overdue{--c:var(--red);--soft:var(--red-soft)} .p-due30{--c:var(--orange);--soft:var(--orange-soft)} .p-due90{--c:var(--yellow);--soft:var(--yellow-soft)} .p-ok{--c:var(--green);--soft:var(--green-soft)} .p-none{--c:var(--grey);--soft:var(--grey-soft)}
+.wo{display:flex;flex-direction:column;gap:3px}
+.wo .tag{font-size:12px;font-weight:500;padding:1px 7px;border-radius:var(--r);border:1px solid var(--rule);border-left-width:4px;align-self:flex-start;white-space:nowrap;color:var(--ink)}
+.w-in_progress{border-color:var(--un)!important;background:var(--accent-soft)}
+.w-blocked{border-color:var(--red)!important;background:var(--red-soft)}
+.w-backlog,.w-selected{border-color:var(--orange)!important;background:var(--orange-soft)}
+.w-done{border-color:var(--green)!important}
+.w-cancelled{color:var(--muted)!important;text-decoration:line-through}
+.w-none{color:var(--muted)!important;border-style:dashed!important;border-left-width:1px!important}
+.sm{font-size:11.5px;color:var(--muted)}
+.mono{font-family:var(--mono);font-size:12px}
+.yn{display:inline-flex;align-items:center;gap:6px;font-weight:500}
+.yn::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--c)}
+.yes{--c:var(--green)} .no{--c:var(--red)}
+.rk{font-weight:700}
+.prio{font-size:10.5px;font-weight:700;letter-spacing:.04em;color:var(--on-accent);background:var(--accent-strong);border-radius:3px;padding:1px 5px;margin-left:6px}
+.src{min-width:260px;max-width:340px}
+.live{font-size:11px;color:var(--accent-ink)}
+.orgonly{display:inline-flex;align-items:center;gap:6px}
+.orgonly::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--orange)}
+tr.detail td{background:var(--surface-2);padding:14px 18px 18px;border-left:5px solid var(--accent)}
+td.nw{white-space:nowrap}
+.dgrid{position:sticky;left:18px;max-width:min(1180px,calc(100vw - 96px));display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px 28px}
+.dgrid h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--accent-ink)}
+.dgrid dl{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:0}
+.dgrid dt{color:var(--muted)} .dgrid dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.lv{display:grid;grid-template-columns:auto auto 1fr;gap:3px 12px}
+.lv span:nth-child(3n+2){text-align:right;font-family:var(--mono);font-size:12px}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+footer{font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px;max-width:110ch;border-top:1px solid var(--rule);padding-top:12px}
+@media (prefers-reduced-motion:reduce){.chev{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <p class="eyebrow">OCHA ROAP · Information Management · GIS</p>
+      <h1>COD-AB review tracker</h1>
+      <p class="lede">Administrative boundary CODs for the countries ROAP looks after, ordered by how soon each one needs its review. Click a row for admin levels, sources and caveats.</p>
+    </div>
+    <div class="meta">
+      <div class="meta-line"><span>Data: <b id="asof">loading…</b></span><span>Today: <b id="today">—</b></span></div>
+      <div class="tools">
+        <div class="scope" role="group" aria-label="Country scope">
+          <button id="sc-roap" type="button" aria-pressed="true">ROAP-tagged</button>
+          <button id="sc-rfm" type="button" aria-pressed="false">All RFM</button>
+        </div>
+        <button id="refresh" class="btn" type="button">Refresh from FIS</button>
+      </div>
+      <p id="livenote" class="note">Loading the team copy of the COD-AB Status Dashboard data…</p>
+    </div>
+  </header>
+
+  <section class="tiles" id="tiles" aria-label="Review status summary"></section>
+
+  <div class="bar">
+    <div class="tools">
+      <input id="q" class="search" type="search" placeholder="Search country, ISO3 or source" aria-label="Search">
+      <button id="clear" class="btn ghost" type="button">Clear filters</button>
+    </div>
+    <span class="count" id="count"></span>
+  </div>
+
+  <div class="tablebox">
+    <table id="tbl">
+      <thead>
+        <tr class="h" id="hrow"></tr>
+        <tr class="f" id="frow"></tr>
+      </thead>
+      <tbody id="tb"><tr><td class="empty">Loading data…</td></tr></tbody>
+    </table>
+  </div>
+
+  <footer>
+    <span><b>Next review</b> = the later of last review and last update, plus the dataset's update frequency (1 year for most datasets, 2 for some). This follows the 12-month review cycle in the IM Toolbox and matches the "Next review" column on the FIS dashboard.</span>
+    <span><b>Scope.</b> "ROAP-tagged" uses the dashboard's Regional office field. "All RFM" adds the other countries in the Regional Focus Model (set in <code>config.json</code>) that the dashboard leaves untagged, such as Afghanistan, Pakistan and the Pacific islands.</span>
+    <span><b>Data flow.</b> A GitHub Action copies the FIS dashboard's CSV files into this repository every day after FIS updates them (06:00 UTC). The page reads that copy. "Refresh from FIS" reads the FIS files directly, for when you need changes made since the last daily sync.</span>
+    <span>Sources: <a href="https://ocha-dap.github.io/hdx-cod-ab-status/" target="_blank" rel="noopener">COD-AB Status Dashboard (OCHA FIS)</a> · <a href="https://response.reliefweb.int/asia-and-pacific/asia-and-pacific-regional-focus-model" target="_blank" rel="noopener">Asia and the Pacific Regional Focus Model</a> · <a href="https://humanitarian.atlassian.net/wiki/spaces/imtoolbox/pages/3923640334/COD-AB+development+reviews+and+maintenance" target="_blank" rel="noopener">IM Toolbox: COD-AB reviews and maintenance</a></span>
+  </footer>
+</div>
+
+<script>
+(function(){
+'use strict';
+const FILES = ['work','gis','cod_metadata','hdx','plans','offices','regions','m49'];
+const ST = {overdue:{l:'Overdue',r:0},due30:{l:'Due ≤ 30 days',r:1},due90:{l:'Due in 31–90 days',r:2},ok:{l:'On track',r:3},none:{l:'No COD-AB in GIS',r:4}};
+const WO = {in_progress:{l:'In progress',r:0},blocked:{l:'Blocked',r:1},selected:{l:'Initialized',r:2},backlog:{l:'Backlog',r:3},done:{l:'Done',r:5},cancelled:{l:'Cancelled',r:6},none:{l:'None',r:7}};
+const PG = {1:'HNRP / HRP / FA (current year)',2:'Other plan (current year)',3:'HNRP / HRP / FA, earlier',4:'Other plan, earlier',5:'No plan'};
+const DAY = 864e5;
+const today = new Date(); today.setHours(0,0,0,0);
+const thisYear = String(today.getFullYear());
+
+let CFG = null, COUNTRIES = [], SOURCE = null;
+const store = {
+  get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+};
+const defaults = {scope:'roap',sortKey:'urgency',sortDir:1,f:{q:'',rfm:'',status:'',gis:'',adm:'',wo:'',plan:'',office:'',vis:'',src:''}};
+let state = Object.assign({}, defaults, store.get('codab.state')||{});
+state.f = Object.assign({}, defaults.f, state.f||{});
+const openRows = new Set();
+
+/* ---------- helpers ---------- */
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pd = s => { if(!s) return null; const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s); return m? new Date(+m[1],+m[2]-1,+m[3]) : null; };
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fd = d => d ? d.getDate()+' '+MON[d.getMonth()]+' '+d.getFullYear() : '—';
+const ft = d => fd(d)+', '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+function rel(days){
+  const a=Math.abs(days);
+  const txt = a<45 ? a+(a===1?' day':' days') : Math.round(a/30.44)+' months';
+  return days<0 ? txt+' late' : (days===0?'today':'in '+txt);
+}
+function parseCSV(t){
+  const rows=[]; let row=[], f='', q=false;
+  for(let i=0;i<t.length;i++){
+    const c=t[i];
+    if(q){ if(c==='"'){ if(t[i+1]==='"'){f+='"';i++} else q=false } else f+=c; }
+    else if(c==='"') q=true;
+    else if(c===','){ row.push(f); f=''; }
+    else if(c==='\n'){ row.push(f.replace(/\r$/,'')); rows.push(row); row=[]; f=''; }
+    else f+=c;
+  }
+  if(f||row.length){ row.push(f.replace(/\r$/,'')); rows.push(row); }
+  const h=(rows.shift()||[]).map(x=>x.trim());
+  return rows.filter(r=>r.length>1||r[0]).map(r=>Object.fromEntries(h.map((k,i)=>[k,(r[i]||'').trim()])));
+}
+const vnum = v => +(String(v||'').replace(/\D/g,''))||0;
+
+/* ---------- data pipeline: FIS CSVs -> one record per country ---------- */
+function buildCountries(raw, cfg){
+  const d={}; for(const k of FILES) d[k]=parseCSV(raw[k]||'');
+  for(const k of ['work','regions','cod_metadata']) if(!d[k].length) throw new Error('The '+k+'.csv file is empty or missing.');
+  const ro = cfg.regionalOffice;
+  const ranks = (cfg.rfm&&cfg.rfm.ranks)||{};
+  const isos = [...new Set([...d.regions.filter(r=>r.regional===ro).map(r=>r.iso3), ...Object.keys(ranks)])];
+  const big=['HNRP','HRP','FA'];
+  const gis=new Set(d.gis.map(x=>x.iso3)), hdx=new Set(d.hdx.map(x=>x.iso3));
+  return isos.map(iso=>{
+    const md=d.cod_metadata.filter(m=>m.country_iso3===iso).sort((a,b)=>vnum(a.version)-vnum(b.version)||String(a.date_updated).localeCompare(String(b.date_updated)));
+    const L=md[md.length-1];
+    const pl=d.plans.filter(p=>p.iso3===iso);
+    const cur=pl.filter(p=>p.year===thisYear), prior=pl.filter(p=>p.year<thisYear).sort((a,b)=>b.year.localeCompare(a.year));
+    const tc=[...new Set(cur.map(p=>p.type))];
+    let pg,plan;
+    if(tc.some(t=>big.includes(t))){pg=1;plan=tc.join(' / ')+' '+thisYear}
+    else if(tc.length){pg=2;plan=tc.join(' / ')+' '+thisYear}
+    else { const pb=prior.find(p=>big.includes(p.type)); if(pb){pg=3;plan=pb.type+' '+pb.year} else if(prior.length){pg=4;plan=prior[0].type+' '+prior[0].year} else {pg=5;plan=''} }
+    const m49=d.m49.find(r=>r.iso_alpha3_code===iso)||{};
+    const c={i:iso, n:(cfg.shortNames&&cfg.shortNames[iso])||(L&&L.country_name)||m49.country_or_area||iso,
+      r:(d.regions.find(r=>r.iso3===iso)||{}).regional||'', sr:m49.sub_region_name||'',
+      g:gis.has(iso)?1:0, h:hdx.has(iso)?1:0, o:(d.offices.find(x=>x.iso3===iso)||{}).type||'', pg, pl:plan,
+      w:d.work.filter(x=>x.iso3===iso).map(x=>[x.id,x.update_type,x.status,x.creation_date,x.planned_quarter,x.publication_date])};
+    if(L){
+      const cnt=[], nm=[];
+      for(let k=1;k<=5;k++){ if(L['admin_'+k+'_count']){ cnt.push(+L['admin_'+k+'_count']); nm.push(L['admin_'+k+'_name']||''); } }
+      c.m={v:L.version, vc:md.length, vis:L.visibility, lf:+L.admin_level_full||null, lm:+L.admin_level_max||null, c:cnt, an:nm,
+        dr:L.date_reviewed, du:L.date_updated, ds:L.date_source, dv:L.date_valid_on, dt:L.date_valid_to, uf:+L.update_frequency||1,
+        src:L.source, ct:L.contributor, fs:L.feature_server_url, cv:L.caveats||''};
+    }
+    return c;
+  });
+}
+
+async function fetchSet(base, bust){
+  const q = bust ? '?t='+Date.now() : '';
+  const texts = await Promise.all(FILES.map(f=>fetch(base+f+'.csv'+q,{cache:bust?'no-store':'default'}).then(r=>{ if(!r.ok) throw new Error(f+'.csv returned HTTP '+r.status); return r.text(); })));
+  return Object.fromEntries(FILES.map((f,i)=>[f,texts[i]]));
+}
+
+/* ---------- derive review status ---------- */
+function enrich(c){
+  const m=c.m, ranks=(CFG.rfm&&CFG.rfm.ranks)||{};
+  const o={c, iso:c.i, name:c.n, rank:ranks[c.i]||null};
+  o.inScope = state.scope==='rfm' ? (c.r===CFG.regionalOffice || !!o.rank) : c.r===CFG.regionalOffice;
+  if(m){
+    const dr=pd(m.dr), du=pd(m.du);
+    const base=(dr&&du)?(dr>du?dr:du):(dr||du);
+    o.dr=dr; o.du=du; o.lf=m.lf; o.lm=m.lm;
+    if(base){ o.next=new Date(base); o.next.setFullYear(o.next.getFullYear()+(m.uf||1)); o.days=Math.round((o.next-today)/DAY); }
+  }
+  if(!m || !c.g || o.days==null) o.status='none';
+  else o.status = o.days<0?'overdue':o.days<=30?'due30':o.days<=90?'due90':'ok';
+  const ws=(c.w||[]).map(w=>({id:w[0],type:w[1],st:w[2]||'backlog',created:w[3],q:w[4],pub:w[5]}));
+  ws.sort((a,b)=>((WO[a.st]||{r:9}).r-(WO[b.st]||{r:9}).r) || String(b.pub||b.created).localeCompare(String(a.pub||a.created)));
+  o.ws=ws; o.wo=ws[0]||null; o.woKey=o.wo?o.wo.st:'none';
+  o.woOpen=ws.some(w=>!['done','cancelled'].includes(w.st));
+  return o;
+}
+
+const COLS = [
+  {k:'name',l:'Country',f:'q'},
+  {k:'rank',l:'RFM rank',f:'rfm',opts:[['p','Priority (top 15)'],['o','Rank 16+'],['n','Not in RFM']]},
+  {k:'urgency',l:'Review status',f:'status',opts:Object.entries(ST).map(([k,v])=>[k,v.l])},
+  {k:'next',l:'Next review'},
+  {k:'dr',l:'Last review'},
+  {k:'du',l:'Last update'},
+  {k:'gis',l:'In GIS',f:'gis',opts:[['1','Yes'],['0','No']]},
+  {k:'adm',l:'Admin level',f:'adm',opts:[['1','ADM1'],['2','ADM2'],['3','ADM3'],['4','ADM4'],['5','ADM5'],['-','None']]},
+  {k:'wo',l:'Work order',f:'wo',opts:[['open','Any open order'],...Object.entries(WO).map(([k,v])=>[k,v.l])]},
+  {k:'plan',l:'Plan',f:'plan',opts:Object.entries(PG)},
+  {k:'office',l:'Office',f:'office',opts:[['CO','CO'],['HAT','HAT'],['RO','RO'],['-','None']]},
+  {k:'src',l:'Source',f:'src'},
+  {k:'vis',l:'Visibility',f:'vis',opts:[['public','Public'],['organization','Organization only'],['-','—']]}
+];
+
+function sortVal(o,k){
+  switch(k){
+    case 'name': return o.name.toLowerCase();
+    case 'rank': return o.rank==null?999:o.rank;
+    case 'urgency': return ST[o.status].r*1e6 + (o.status==='none' ? (o.rank||500) : (o.days==null?9e5:o.days+5e5));
+    case 'next': return o.days==null?9e9:o.days;
+    case 'dr': return o.dr?+o.dr:-9e15;
+    case 'du': return o.du?+o.du:-9e15;
+    case 'gis': return o.c.g?0:1;
+    case 'adm': return o.lf||0;
+    case 'wo': return (WO[o.woKey]||{r:9}).r;
+    case 'plan': return o.c.pg||5;
+    case 'office': return o.c.o||'~';
+    case 'src': return ((o.c.m&&o.c.m.src)||'~').toLowerCase();
+    case 'vis': return (o.c.m&&o.c.m.vis)||'~';
+  }
+  return 0;
+}
+
+function pass(o, skipStatus){
+  const f=state.f, c=o.c;
+  if(f.q){ const q=f.q.toLowerCase(); const hay=(o.name+' '+o.iso+' '+((c.m&&c.m.src)||'')+' '+(c.sr||'')).toLowerCase(); if(!hay.includes(q)) return false; }
+  if(f.src && !((c.m&&c.m.src)||'').toLowerCase().includes(f.src.toLowerCase())) return false;
+  if(f.rfm){ if(f.rfm==='p'&&!(o.rank&&o.rank<=15)) return false; if(f.rfm==='o'&&!(o.rank&&o.rank>15)) return false; if(f.rfm==='n'&&o.rank) return false; }
+  if(!skipStatus && f.status && o.status!==f.status) return false;
+  if(f.gis!=='' && String(c.g)!==f.gis) return false;
+  if(f.adm){ if(f.adm==='-'){ if(o.lf) return false; } else if(String(o.lf)!==f.adm) return false; }
+  if(f.wo){ if(f.wo==='open'){ if(!o.woOpen) return false; } else if(o.woKey!==f.wo) return false; }
+  if(f.plan && String(c.pg)!==f.plan) return false;
+  if(f.office){ if(f.office==='-'){ if(c.o) return false; } else if(c.o!==f.office) return false; }
+  if(f.vis){ const v=(c.m&&c.m.vis)||'-'; if(v!==f.vis) return false; }
+  return true;
+}
+
+/* ---------- rendering ---------- */
+function renderHead(){
+  document.getElementById('hrow').innerHTML = COLS.map(col=>{
+    const on=state.sortKey===col.k, aria=on?(state.sortDir>0?'ascending':'descending'):'none', ar=on?(state.sortDir>0?'▲':'▼'):'↕';
+    return '<th scope="col"'+(col.k==='rank'?' class="num-col"':'')+'><button class="sort" type="button" data-sort="'+col.k+'" aria-sort="'+aria+'">'+esc(col.l)+'<span class="ar" aria-hidden="true">'+ar+'</span></button></th>';
+  }).join('');
+  document.getElementById('frow').innerHTML = COLS.map(col=>{
+    if(!col.f) return '<th></th>';
+    if(col.f==='q'||col.f==='src'){
+      const v=state.f[col.f]||'';
+      return '<th><input id="f-'+col.f+'" data-f="'+col.f+'" type="text" value="'+esc(v)+'" placeholder="Filter" aria-label="Filter '+esc(col.l)+'" class="'+(v?'on':'')+'"></th>';
+    }
+    const cur=state.f[col.f]||'';
+    return '<th><select id="f-'+col.f+'" data-f="'+col.f+'" aria-label="Filter '+esc(col.l)+'" class="'+(cur?'on':'')+'"><option value="">All</option>'+
+      col.opts.map(([v,l])=>'<option value="'+esc(v)+'"'+(String(cur)===String(v)?' selected':'')+'>'+esc(l)+'</option>').join('')+'</select></th>';
+  }).join('');
+}
+
+function cells(o){
+  const c=o.c, m=c.m||{};
+  const prio=o.rank&&o.rank<=15?'<span class="prio">P</span>':'';
+  const out=[];
+  out.push('<td><div class="cname"><span class="nm"><span class="chev" aria-hidden="true">›</span> '+esc(o.name)+'</span><span class="iso">'+esc(o.iso)+(c.sr?' · '+esc(c.sr):'')+'</span></div></td>');
+  out.push('<td class="num nw">'+(o.rank?'<span class="rk">'+o.rank+'</span>'+prio:'<span class="sm">—</span>')+'</td>');
+  out.push('<td><span class="pill p-'+o.status+'">'+esc(ST[o.status].l)+'</span></td>');
+  out.push(o.next?'<td><div>'+fd(o.next)+'</div><div class="sm">'+esc(rel(o.days))+'</div></td>':'<td><span class="sm">—</span></td>');
+  out.push('<td>'+(o.dr?fd(o.dr):'<span class="sm">—</span>')+'</td>');
+  out.push('<td>'+(o.du?'<div>'+fd(o.du)+'</div><div class="sm">'+((today-o.du)/DAY/365.25).toFixed(1)+' yrs ago</div>':'<span class="sm">—</span>')+'</td>');
+  out.push('<td>'+(c.g?'<span class="yn yes">Yes</span>':'<span class="yn no">No</span>')+(c.h&&!c.g?'<div class="sm">HDX page only</div>':'')+'</td>');
+  out.push('<td>'+(o.lf?'<span class="mono">ADM'+o.lf+'</span>'+(o.lm&&o.lm!==o.lf?'<div class="sm">max ADM'+o.lm+'</div>':''):'<span class="sm">—</span>')+'</td>');
+  if(o.wo){
+    const w=o.wo, extra=[w.type?(w.type==='major'?'Major':'Minor'):'', w.q].filter(Boolean).join(' · ');
+    out.push('<td><div class="wo"><span class="tag w-'+esc(w.st)+'">'+esc((WO[w.st]||{l:w.st}).l)+'</span>'+(w.id?'<span class="mono sm">'+esc(w.id)+'</span>':'')+(extra?'<span class="sm">'+esc(extra)+'</span>':'')+(o.ws.length>1?'<span class="sm">+'+(o.ws.length-1)+' more</span>':'')+'</div></td>');
+  } else out.push('<td><div class="wo"><span class="tag w-none">None</span></div></td>');
+  out.push('<td>'+(c.pl?esc(c.pl):'<span class="sm">—</span>')+'</td>');
+  out.push('<td>'+(c.o?esc(c.o):'<span class="sm">—</span>')+'</td>');
+  out.push('<td><div class="src">'+(m.src?esc(m.src):'<span class="sm">—</span>')+'</div></td>');
+  out.push('<td>'+(m.vis?(m.vis==='public'?'Public':'<span class="orgonly">Org only</span>'):'<span class="sm">—</span>')+'</td>');
+  return out.join('');
+}
+
+function detail(o){
+  const c=o.c, m=c.m, links=[];
+  if(c.h) links.push('<a href="https://data.humdata.org/dataset/cod-ab-'+o.iso.toLowerCase()+'" target="_blank" rel="noopener">HDX dataset</a>');
+  if(m&&m.fs) links.push('<a href="'+esc(m.fs)+'" target="_blank" rel="noopener">Feature service</a>');
+  let a='<div><h4>Admin hierarchy</h4>';
+  a += (m&&m.c.length) ? '<div class="lv">'+m.c.map((n,i)=>'<span class="mono">ADM'+(i+1)+'</span><span>'+n.toLocaleString('en-US')+'</span><span class="sm">'+esc(m.an[i]||'')+'</span>').join('')+'</div>'
+       : '<p class="sm">No COD-AB metadata in the OCHA GIS catalogue.'+(c.h?' A COD-AB page exists on HDX.':'')+'</p>';
+  a+='</div>';
+  let b='<div><h4>Dataset</h4><dl>';
+  if(m){
+    b+='<dt>Version</dt><dd>'+esc(m.v||'—')+' ('+m.vc+' in catalogue)</dd>';
+    b+='<dt>Source date</dt><dd>'+fd(pd(m.ds))+'</dd>';
+    b+='<dt>Valid on</dt><dd>'+fd(pd(m.dv))+(m.dt?' → '+fd(pd(m.dt)):'')+'</dd>';
+    b+='<dt>Update freq.</dt><dd>Every '+m.uf+' year'+(m.uf>1?'s':'')+'</dd>';
+    b+='<dt>Contributor</dt><dd>'+esc(m.ct||'—')+'</dd>';
+  } else b+='<dt>Status</dt><dd>Not in catalogue</dd>';
+  b+='<dt>Links</dt><dd>'+(links.join(' · ')||'—')+'</dd></dl></div>';
+  let w='<div><h4>Work orders</h4>';
+  w += o.ws.length ? '<dl>'+o.ws.map(x=>'<dt>'+esc((WO[x.st]||{l:x.st}).l)+'</dt><dd><span class="mono">'+esc(x.id||'—')+'</span>'+[x.type,x.q,x.pub?('published '+fd(pd(x.pub))):''].filter(Boolean).map(t=>' · '+esc(t)).join('')+'</dd>').join('')+'</dl>' : '<p class="sm">No work orders tracked.</p>';
+  w+='</div>';
+  const cv=(m&&m.cv)||''; const cvShort=cv.length>420?cv.slice(0,420)+'…':cv;
+  const e='<div><h4>Caveats</h4><p class="sm" style="margin:0;white-space:pre-line">'+(cvShort?esc(cvShort):'None recorded.')+'</p></div>';
+  return '<tr class="detail"><td colspan="'+COLS.length+'"><div class="dgrid">'+a+b+w+e+'</div></td></tr>';
+}
+
+function renderTiles(all){
+  const sc=all.filter(o=>o.inScope&&pass(o,true));
+  const n=k=>sc.filter(o=>o.status===k).length;
+  const tiles=[['overdue','t-overdue',n('overdue'),'Overdue','past the review date'],['due30','t-due30',n('due30'),'Due ≤ 30 days','review this month'],
+    ['due90','t-due90',n('due90'),'Due in 31–90 days','plan ahead'],['ok','t-ok',n('ok'),'On track','more than 90 days'],
+    ['none','t-none',n('none'),'No COD-AB in GIS','gap to close'],['wo','t-wo',sc.filter(o=>o.woOpen).length,'Open work orders','countries with one']];
+  document.getElementById('tiles').innerHTML=tiles.map(([k,cls,num,l,s])=>{
+    const pressed=k==='wo'?state.f.wo==='open':state.f.status===k;
+    return '<button type="button" class="tile '+cls+'" data-tile="'+k+'" aria-pressed="'+pressed+'"><span class="num">'+num+'</span><span class="lbl">'+l+'</span><span class="sub">'+s+'</span></button>';
+  }).join('');
+}
+
+function render(){
+  store.set('codab.state', state);
+  if(!CFG) return;
+  const all=COUNTRIES.map(enrich);
+  const scoped=all.filter(o=>o.inScope);
+  const rows=scoped.filter(o=>pass(o));
+  const k=state.sortKey, dir=state.sortDir;
+  rows.sort((a,b)=>{const x=sortVal(a,k),y=sortVal(b,k); if(x<y) return -dir; if(x>y) return dir; return sortVal(a,'urgency')-sortVal(b,'urgency');});
+  renderTiles(all); renderHead();
+  const ro=CFG.regionalOffice, yr=(CFG.rfm&&CFG.rfm.year)||'';
+  const bR=document.getElementById('sc-roap'), bF=document.getElementById('sc-rfm');
+  bR.setAttribute('aria-pressed',state.scope==='roap'); bF.setAttribute('aria-pressed',state.scope==='rfm');
+  bR.textContent=ro+'-tagged ('+all.filter(o=>o.c.r===ro).length+')';
+  bF.textContent='All RFM '+yr+' ('+all.filter(o=>o.c.r===ro||o.rank).length+')';
+  document.getElementById('count').textContent='Showing '+rows.length+' of '+scoped.length+' countries';
+  document.getElementById('q').value=state.f.q;
+  const tb=document.getElementById('tb');
+  if(!rows.length){ tb.innerHTML='<tr><td colspan="'+COLS.length+'" class="empty">No countries match these filters. Use "Clear filters" to see all.</td></tr>'; return; }
+  tb.innerHTML=rows.map(o=>{ const open=openRows.has(o.iso);
+    return '<tr class="row s-'+o.status+(open?' open':'')+'" data-iso="'+o.iso+'" tabindex="0" aria-expanded="'+open+'">'+cells(o)+'</tr>'+(open?detail(o):''); }).join('');
+}
+
+/* ---------- events ---------- */
+document.getElementById('hrow').addEventListener('click',e=>{ const b=e.target.closest('[data-sort]'); if(!b) return; const k=b.dataset.sort; if(state.sortKey===k) state.sortDir*=-1; else {state.sortKey=k; state.sortDir=1;} render(); });
+document.getElementById('frow').addEventListener('change',e=>{ const el=e.target.closest('select[data-f]'); if(!el) return; state.f[el.dataset.f]=el.value; render(); });
+document.getElementById('frow').addEventListener('input',e=>{ const el=e.target.closest('input[data-f]'); if(!el) return; clearTimeout(el._t); const id=el.id;
+  el._t=setTimeout(()=>{ state.f[el.dataset.f]=el.value; render(); const again=document.getElementById(id); if(again){again.focus(); again.setSelectionRange(again.value.length,again.value.length);} },250); });
+document.getElementById('q').addEventListener('input',e=>{ clearTimeout(e.target._t); e.target._t=setTimeout(()=>{ state.f.q=e.target.value; render(); document.getElementById('q').focus(); },200); });
+document.getElementById('clear').addEventListener('click',()=>{ state.f=Object.assign({},defaults.f); state.sortKey='urgency'; state.sortDir=1; render(); });
+document.getElementById('tiles').addEventListener('click',e=>{ const t=e.target.closest('[data-tile]'); if(!t) return; const k=t.dataset.tile;
+  if(k==='wo') state.f.wo=state.f.wo==='open'?'':'open'; else state.f.status=state.f.status===k?'':k; render(); });
+document.getElementById('sc-roap').addEventListener('click',()=>{state.scope='roap'; render();});
+document.getElementById('sc-rfm').addEventListener('click',()=>{state.scope='rfm'; render();});
+const tb=document.getElementById('tb');
+function toggle(tr){ const iso=tr.dataset.iso; if(openRows.has(iso)) openRows.delete(iso); else openRows.add(iso); render(); const again=tb.querySelector('tr[data-iso="'+iso+'"]'); if(again) again.focus(); }
+tb.addEventListener('click',e=>{ if(e.target.closest('a')) return; const tr=e.target.closest('tr.row'); if(tr) toggle(tr); });
+tb.addEventListener('keydown',e=>{ if(e.key!=='Enter'&&e.key!==' ') return; const tr=e.target.closest('tr.row'); if(tr){e.preventDefault(); toggle(tr);} });
+
+/* ---------- loading ---------- */
+const note=document.getElementById('livenote'), btn=document.getElementById('refresh');
+function setNote(t,cls){ note.textContent=t; note.className='note'+(cls?' '+cls:''); }
+function setSource(kind, when, syncStatus){
+  SOURCE={kind,when};
+  document.getElementById('asof').textContent = kind==='live' ? 'FIS dashboard, read '+ft(when) : 'Team copy, checked '+(when?ft(when):'(time unknown)');
+  if(kind==='live') setNote('Showing data read directly from the FIS dashboard files.','good');
+  else if(syncStatus && syncStatus!=='success') setNote('The last daily sync could not read the FIS files, so this copy may be older than shown. Use "Refresh from FIS".','err');
+  else setNote('Showing the daily team copy. Use "Refresh from FIS" for changes made since then.','good');
+}
+async function loadLive(){
+  btn.disabled=true; setNote('Reading the latest files from the FIS dashboard…');
+  try{
+    const raw=await fetchSet(CFG.fisBase, true);
+    COUNTRIES=buildCountries(raw, CFG); setSource('live', new Date()); render();
+  }catch(err){
+    setNote('Could not read the FIS dashboard files ('+(err&&err.message||err)+'). '+(COUNTRIES.length?'Still showing the previous data.':'Check your connection and try again.'),'err');
+  }finally{ btn.disabled=false; }
+}
+btn.addEventListener('click', loadLive);
+
+(async function init(){
+  document.getElementById('today').textContent=fd(today);
+  try{ CFG=await fetch('config.json',{cache:'no-cache'}).then(r=>{ if(!r.ok) throw new Error('config.json returned HTTP '+r.status); return r.json(); }); }
+  catch(err){ setNote('Could not load config.json ('+err.message+'). Open the page from GitHub Pages or a local web server, not as a file.','err'); return; }
+  try{
+    const raw=await fetchSet('data/', false);
+    COUNTRIES=buildCountries(raw, CFG);
+    let when=null, st=null; try{ const s=await fetch('data/last_sync.json',{cache:'no-cache'}).then(r=>r.json()); when=s.synced_at?new Date(s.synced_at):null; st=s.sync_status||null; }catch(e){}
+    setSource('copy', when, st); render();
+  }catch(err){
+    setNote('The team copy is not available yet ('+err.message+'). Reading the FIS dashboard directly instead…');
+    await loadLive();
+  }
+})();
+})();
+</script>
+</body>
+</html>
